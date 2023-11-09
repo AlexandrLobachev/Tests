@@ -8,7 +8,6 @@ from news.models import Comment
 from news.forms import WARNING
 
 
-
 @pytest.mark.django_db
 def test_anonymous_user_cant_create_comment(
     client, news, form_comment
