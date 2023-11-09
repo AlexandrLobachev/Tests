@@ -25,23 +25,25 @@ class TestCreateNote(TestCase):
         }
 
     def test_anonymous_user_cant_create_note(self):
+        notes_count_before_test = Note.objects.count()
         login_url = reverse('users:login')
         expected_url = f'{login_url}?next={self.url}'
         response = self.client.post(self.url, data=self.form_data)
         self.assertRedirects(response, expected_url)
-        notes_count = Note.objects.count()
-        self.assertEqual(notes_count, 0)
+        notes_count_after_test = Note.objects.count()
+        self.assertEqual(notes_count_before_test, notes_count_after_test)
 
     def test_auth_user_can_create_note(self):
+        notes_count_before_test = Note.objects.count()
         self.client.force_login(self.author)
         response = self.client.post(self.url, data=self.form_data)
         self.assertRedirects(response, reverse('notes:success'))
-        notes_count = Note.objects.count()
+        notes_count_after_test = Note.objects.count()
         note = Note.objects.get()
-        self.assertEqual(notes_count, 1)
-        self.assertEqual(note.title, self.form_data['title'])
-        self.assertEqual(note.text, self.form_data['text'])
-        self.assertEqual(note.slug, self.form_data['slug'])
+        self.assertEqual(notes_count_before_test + 1, notes_count_after_test)
+        self.assertEqual(note.title, self.form_data.get('title'))
+        self.assertEqual(note.text, self.form_data.get('text'))
+        self.assertEqual(note.slug, self.form_data.get('slug'))
         self.assertEqual(note.author, self.author)
 
     def test_empty_slug(self):
@@ -52,7 +54,7 @@ class TestCreateNote(TestCase):
         notes_count = Note.objects.count()
         self.assertEqual(notes_count, 1)
         note = Note.objects.get()
-        expected_slug = slugify(self.form_data['title'])
+        expected_slug = slugify(self.form_data.get('title'))
         self.assertEqual(note.slug, expected_slug)
 
 
@@ -78,28 +80,32 @@ class TestEditNote(TestCase):
         }
 
     def test_not_unique_slug(self):
+        notes_count_before_test = Note.objects.count()
         url = reverse('notes:add')
-        self.form_data['slug'] = self.note.slug
+        slug_first_note = self.note.slug
+        self.form_data['slug'] = slug_first_note
         response = self.auth_client.post(url, data=self.form_data)
         self.assertFormError(response, 'form', 'slug',
-                             errors=(self.form_data['slug'] + WARNING))
-        notes_count = Note.objects.count()
-        self.assertEqual(notes_count, 1)
+                             errors=(slug_first_note + WARNING))
+        notes_count_after_test = Note.objects.count()
+        self.assertEqual(notes_count_before_test, notes_count_after_test)
 
     def test_author_can_edit_note(self):
         url = reverse('notes:edit', args=(self.note.slug,))
         response = self.auth_client.post(url, data=self.form_data)
         self.assertRedirects(response, reverse('notes:success'))
         self.note.refresh_from_db()
-        self.assertEqual(self.note.title, self.form_data['title'])
-        self.assertEqual(self.note.text, self.form_data['text'])
-        self.assertEqual(self.note.slug, self.form_data['slug'])
+        self.assertEqual(self.note.title, self.form_data.get('title'))
+        self.assertEqual(self.note.text, self.form_data.get('text'))
+        self.assertEqual(self.note.slug, self.form_data.get('slug'))
 
     def test_author_can_delete_note(self):
+        notes_count_before_test = Note.objects.count()
         url = reverse('notes:delete', args=(self.note.slug,))
         response = self.auth_client.post(url, data=self.form_data)
         self.assertRedirects(response, reverse('notes:success'))
-        self.assertEqual(Note.objects.count(), 0)
+        notes_count_after_test = Note.objects.count()
+        self.assertEqual(notes_count_before_test - 1, notes_count_after_test)
 
     def test_other_user_cant_edit_note(self):
         self.client.force_login(self.user)
@@ -112,8 +118,10 @@ class TestEditNote(TestCase):
         self.assertEqual(self.note.slug, note_from_db.slug)
 
     def test_other_user_cant_delete_note(self):
+        notes_count_before_test = Note.objects.count()
         self.client.force_login(self.user)
         url = reverse('notes:delete', args=(self.note.slug,))
         response = self.client.post(url, data=self.form_data)
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
-        self.assertEqual(Note.objects.count(), 1)
+        notes_count_after_test = Note.objects.count()
+        self.assertEqual(notes_count_before_test, notes_count_after_test)

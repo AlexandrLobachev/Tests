@@ -2,7 +2,7 @@
 from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 
 from notes.models import Note
@@ -16,7 +16,11 @@ class TestRoutes(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.author = User.objects.create(username='Автор')
-        cls.otheruser = User.objects.create(username='Пользователь')
+        cls.auth_author = Client()
+        cls.auth_author.force_login(cls.author)
+        cls.second_user = User.objects.create(username='Второй пользователь')
+        cls.auth_second_user = Client()
+        cls.auth_second_user.force_login(cls.second_user)
         cls.note = Note.objects.create(
             title='Заголовок',
             text='Текст заметки',
@@ -24,47 +28,7 @@ class TestRoutes(TestCase):
             author=cls.author,
         )
 
-    def test_pages_availability_for_anonymous_user(self):
-        urls = (
-            ('notes:home'),
-            ('users:login'),
-            ('users:logout'),
-            ('users:signup'),
-        )
-        for name in urls:
-            with self.subTest(name=name):
-                url = reverse(name)
-                response = self.client.get(url)
-                self.assertEqual(response.status_code, HTTPStatus.OK)
-
-    def test_pages_availability_for_auth_user(self):
-        urls = (
-            ('notes:list'),
-            ('notes:add'),
-            ('notes:success'),
-        )
-        self.client.force_login(self.author)
-        for name in urls:
-            with self.subTest(user=self.author, name=name):
-                url = reverse(name)
-                response = self.client.get(url)
-                self.assertEqual(response.status_code, HTTPStatus.OK)
-
-    def test_availability_edit_and_delete(self):
-        users_statuses = (
-            (self.author, HTTPStatus.OK),
-            (self.otheruser, HTTPStatus.NOT_FOUND),
-        )
-        for user, status in users_statuses:
-            self.client.force_login(user)
-            for name in ('notes:edit', 'notes:delete', 'notes:detail'):
-                with self.subTest(user=user, name=name):
-                    url = reverse(name, args=(self.note.slug,))
-                    response = self.client.get(url)
-                    self.assertEqual(response.status_code, status)
-
     def test_redirect_for_anonymous_client(self):
-        # Сохраняем адрес страницы логина:
         login_url = reverse('users:login')
         urls = (
             ('notes:list', None),
@@ -81,3 +45,48 @@ class TestRoutes(TestCase):
                 redirect_url = f'{login_url}?next={url}'
                 response = self.client.get(url)
                 self.assertRedirects(response, redirect_url)
+
+    def test_availability_different_user(self):
+        urls = {
+            ('notes:home', None): (
+                (self.client, HTTPStatus.OK),
+                (self.auth_second_user, HTTPStatus.OK)
+            ),
+            ('users:login', None): (
+                (self.client, HTTPStatus.OK),
+                (self.auth_second_user, HTTPStatus.OK)
+            ),
+            ('users:signup', None): (
+                (self.client, HTTPStatus.OK),
+                (self.auth_second_user, HTTPStatus.OK)
+            ),
+            ('notes:list', None): ((self.auth_second_user, HTTPStatus.OK),),
+            ('notes:add', None): ((self.auth_second_user, HTTPStatus.OK),),
+            ('notes:success', None): ((self.auth_second_user, HTTPStatus.OK),),
+            ('notes:edit', (self.note.slug,)): (
+                (self.auth_second_user, HTTPStatus.NOT_FOUND),
+                (self.auth_author, HTTPStatus.OK)
+            ),
+            ('notes:delete', (self.note.slug,)): (
+                (self.auth_second_user, HTTPStatus.NOT_FOUND),
+                (self.auth_author, HTTPStatus.OK)
+            ),
+            ('notes:detail', (self.note.slug,)): (
+                (self.auth_second_user, HTTPStatus.NOT_FOUND),
+                (self.auth_author, HTTPStatus.OK)
+            ),
+            ('users:logout', None): (
+                (self.client, HTTPStatus.OK),
+                (self.auth_second_user, HTTPStatus.OK)
+            ),
+        }
+        for item in urls.items():
+            name_and_args, user_statuses = item
+            with self.subTest(name_and_args=name_and_args):
+                name, args = name_and_args
+                for user_status in user_statuses:
+                    user, status = user_status
+                    with self.subTest(user_status=user_status):
+                        url = reverse(name, args=args)
+                        response = user.get(url)
+                        self.assertEqual(response.status_code, status)
