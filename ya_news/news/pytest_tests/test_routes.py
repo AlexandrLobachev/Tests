@@ -5,6 +5,7 @@ from pytest_django.asserts import assertRedirects
 from django.urls import reverse
 
 
+
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     'name, args',

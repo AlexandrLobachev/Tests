@@ -5,6 +5,7 @@ from django.conf import settings
 from django.urls import reverse
 
 
+
 @pytest.mark.django_db
 @pytest.mark.usefixtures('paginate_news')
 def test_news_count(client):
