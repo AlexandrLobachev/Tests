@@ -18,11 +18,11 @@
 
 ## Развёртывание проекта:
 + Клонировать репозиторий и перейти в него в командной строке:
-```shell script
+```
 git clone git@github.com:AlexandrLobachev/Tests.git
 ```
 
-```shell script
+```
 cd tests/
 ```
 
