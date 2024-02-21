@@ -12,7 +12,7 @@ Python 3.11 , Django 3.2, Pytest 7.1.3, Unittest, SQLite
 
 <br>
 
-## Развёртывание проекта:
+## Запуск проекта:
 + Клонировать репозиторий и перейти в него в командной строке:
 ```
 git clone git@github.com:AlexandrLobachev/Tests.git
